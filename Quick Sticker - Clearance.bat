@@ -9,16 +9,25 @@ set "outputFile=output.txt"
 
 set /p barcode="Enter Barcode: "
 
-REM Search for SKU based on entered barcode
+REM Initialize flag to check if barcode is found in both files
+set "foundInBarcodeToSKU=0"
+set "foundInMCL=0"
+
+REM Search for SKU based on entered barcode in BarcodeToSKU.csv
 for /f "tokens=1,* delims=," %%a in (%inputFile2%) do (
     if "%%a" equ "%barcode%" (
         set sku=%%b
+        set foundInBarcodeToSKU=1
         goto FoundSKU
     )
 )
-echo Barcode not found in the CSV file.
-pause
-goto LooptoHere
+
+REM If barcode not found in BarcodeToSKU.csv, inform the user and restart the loop
+if !foundInBarcodeToSKU! equ 0 (
+    echo Barcode not found in the BarcodeToSKU.csv file. Please contact Roshan Varughese on workplace with the barcode.
+    pause
+    goto LooptoHere
+)
 
 :FoundSKU
 REM Trim SKU to only first two sections (Product ID/Color)
@@ -26,14 +35,24 @@ for /f "tokens=1-2 delims=/" %%a in ("!sku!") do (
     set "trimmedSKU=%%a/%%b"
 )
 
+REM Search for details based on trimmed SKU in MCL.csv
 for /f "tokens=1-4 delims=," %%a in (%inputFile%) do (
     if "%%a" equ "%trimmedSKU%" (
         set name=%%b
         set color=%%c
         set now=%%d
+        set foundInMCL=1
     )
 )
 
+REM If barcode not found in MCL.csv, inform the user and restart the loop
+if !foundInMCL! equ 0 (
+    echo Barcode details not found in the MCL.csv file. Not a Clearance Product.
+    pause
+    goto LooptoHere
+)
+
+REM Create output.txt file with details
 (
     echo ^^XA~TA000~JSN~^^LT0^^MNW^^MTT^^PON^^PMN^^LH0,0^^JMA^^PR2,2~SD15^^JUS^^LRN^^CI0^^XZ>> %outputFile%
     echo ^^XA^^MMT^^LL0160^^PW320^^LS0>> %outputFile%
@@ -61,6 +80,7 @@ for /f "tokens=1-4 delims=," %%a in (%inputFile%) do (
     echo ^^PQ1,0,1,Y^^XZ>> %outputFile%
 )
 
+REM Copy and clean up
 copy output.txt \\127.0.0.1\Zebra
 pause
 del output.txt
